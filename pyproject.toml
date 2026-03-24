@@ -1,0 +1,61 @@
+[project]
+name = "rfm"
+dynamic = ["version"]
+description = "RFM analytics transformation pipeline (silver_standard + gold_mart) for Databricks"
+authors = [{ name = "wei jheng", email = "wei.jheng@mail.7-11.com.tw" }]
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "workflow/pln_rfm"]
+testpaths = ["tests"]
+addopts = "-v --cov=src --cov-report=term-missing"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rfm"]
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.1.0"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/rfm/_version.py"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2,<10.0.0",
+    "pytest-cov>=7.0.0,<8.0.0",
+    "pyspark>=4.0.0",
+    "pyarrow>=23.0.0,<24.0.0",
+    "mypy>=1.19.1",
+    "ruff>=0.15.0",
+    "pre-commit>=4.5.1",
+]
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+exclude = ["src/rfm/_version.py"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "C", "B", "UP"]
+ignore = ["E501", "B008", "C901", "W191"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+show_error_codes = true
+pretty = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true

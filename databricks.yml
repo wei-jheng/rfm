@@ -1,0 +1,81 @@
+# Databricks Asset Bundle — rfm
+# RFM analytics transformation pipeline (silver_standard + gold_mart) for Databricks
+
+bundle:
+  name: rfm
+
+include:
+  - bundle/pipelines/*.yml
+  - bundle/jobs/*.yml
+
+variables:
+  whl_version:
+    description: "Wheel version, must match the git tag (e.g. 0.1.0). Set automatically by CI via --var=whl_version=<tag>."
+    default: "0.1.0"
+  log_level:
+    description: "Logging level for pipeline tasks (DEBUG / INFO / WARNING / ERROR)"
+    default: INFO
+  today:
+    description: "Target execution date (yyyy-MM-dd). Empty = current date in Asia/Taipei."
+    default: ""
+  n_days:
+    description: "Number of days to include in RFM calculation window."
+    default: "31"
+  catalog_rfm:
+    description: "Unity Catalog name for rfm pipeline output."
+    default: "sandbox"
+  schema_rfm:
+    description: "Schema for rfm pipeline output tables."
+    default: "rfm"
+  slack_notify_destination_id:
+    description: "Notification Destination ID → #data-team-notify (job start/success)"
+    default: ""
+  slack_alert_destination_id:
+    description: "Notification Destination ID → #data-team-alert (job failure)"
+    default: ""
+
+targets:
+  sandbox:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-ba4e934d-4f80.cloud.databricks.com
+      root_path: ~/.bundle/${bundle.name}
+    variables:
+      log_level: DEBUG
+      catalog_rfm: sandbox
+
+  dev:
+    workspace:
+      root_path: /Shared/bundles/${bundle.name}/dev
+    variables:
+      catalog_rfm: dev_gold_mart
+      slack_notify_destination_id: "a24c028f-936d-49f3-a203-7ffeeb1e1925"
+      slack_alert_destination_id: "0f3a2d31-52ed-4a69-a2e5-96616cf93ed4"
+
+  uat:
+    workspace:
+      root_path: /Shared/bundles/${bundle.name}/uat
+    variables:
+      catalog_rfm: uat_gold_mart
+      slack_notify_destination_id: "b5d86d0f-6489-4ace-baea-a306094ece5a"
+      slack_alert_destination_id: "4feefb1d-965a-424b-863d-ed98050a95df"
+
+  uat_dev:
+    workspace:
+      root_path: /Shared/bundles/${bundle.name}/uat_dev
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Shared/bundles/${bundle.name}/prod
+    variables:
+      catalog_rfm: prod_gold_mart
+      slack_notify_destination_id: "51fff447-a32a-46d6-b441-ea7b14113f11"
+      slack_alert_destination_id: "377eff5e-8487-4405-89b4-35ac79f83f57"
+
+artifacts:
+  rfm:
+    type: whl
+    path: .
+    build: uv build --wheel

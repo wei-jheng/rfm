@@ -1,0 +1,31 @@
+resources:
+  pipelines:
+    pln_rfm:
+      name: "[${bundle.target}] pln_rfm"
+      tags:
+        env: ${bundle.target}
+        domain: rfm
+        owner: data_eng
+        resource_type: pipeline
+      allow_duplicate_names: true
+      serverless: true
+      catalog: ${var.catalog_rfm}
+      schema: ${var.schema_rfm}
+      environment:
+        dependencies:
+          - ${workspace.artifact_path}/.internal/rfm-${var.whl_version}-py3-none-any.whl
+      configuration:
+        log_level: ${var.log_level}
+        today: ${var.today}
+        n_days: ${var.n_days}
+      libraries:
+        - file:
+            path: ../../workflow/pln_rfm/transformations/rfm.py
+        - file:
+            path: ../../workflow/pln_rfm/transformations/stats_group.py
+        - file:
+            path: ../../workflow/pln_rfm/transformations/stats_gid.py
+        - file:
+            path: ../../workflow/pln_rfm/transformations/stats_company.py
+        - file:
+            path: ../../workflow/pln_rfm/utilities/utils.py
