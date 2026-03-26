@@ -125,14 +125,6 @@ def _pos_view() -> DataFrame:
     return _transform_pos(spark.readStream.table(_POS_TABLE))
 
 
-dp.create_auto_cdc_flow(  # type: ignore[attr-defined]
-    source='_pos_valid',
-    target=_FACT_TXN_UNIFIED,
-    keys=['gid', 'transaction_id', 'transaction_date'],
-    sequence_by=F.col('_ingest_dt'),
-    stored_as_scd_type=1,
-)
-
 # ── OPEI flow ─────────────────────────────────────────────────────────────────
 
 
@@ -149,8 +141,21 @@ def _opei_view() -> DataFrame:
     return _transform_opei(spark.readStream.table(_OPEI_TABLE), iuo)
 
 
+# ── Union + CDC flow ──────────────────────────────────────────────────────────
+# DLT 限制：每個 streaming table 只能有一個 create_auto_cdc_flow。
+# 先將 POS 和 OPEI 兩個 valid view union 成單一 stream，再做 CDC。
+
+
+@dp.temporary_view(name='_txn_unified_all')  # type: ignore[attr-defined]
+def _txn_unified_all_view() -> DataFrame:
+    """Union POS 和 OPEI valid streams，統一進入 CDC flow。"""
+    return spark.readStream.table('_pos_valid').union(
+        spark.readStream.table('_opei_valid')
+    )
+
+
 dp.create_auto_cdc_flow(  # type: ignore[attr-defined]
-    source='_opei_valid',
+    source='_txn_unified_all',
     target=_FACT_TXN_UNIFIED,
     keys=['gid', 'transaction_id', 'transaction_date'],
     sequence_by=F.col('_ingest_dt'),
