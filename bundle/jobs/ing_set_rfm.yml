@@ -1,0 +1,15 @@
+resources:
+  jobs:
+    ing_set_rfm:
+      name: "[${bundle.target}] ing_set_rfm"
+      tags:
+        env: ${bundle.target}
+        domain: rfm
+        owner: data_eng
+        resource_type: job
+        job_id: J003
+      tasks:
+        - task_key: dlt_rfm_pipeline
+          max_retries: ${var.task_retry_on_failure}
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pln_rfm.id}

@@ -4,6 +4,7 @@ from pyspark.sql import SparkSession
 
 @pytest.fixture(scope='session')
 def spark() -> SparkSession:
+    """Session-scoped SparkSession for unit tests."""
     return (
         SparkSession.builder.master('local')
         .appName('rfm_test')
