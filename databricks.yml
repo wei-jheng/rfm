@@ -42,6 +42,9 @@ variables:
   task_retry_on_failure:
     description: "Default max retries for each task on failure. Override per task by hardcoding max_retries in the job YAML."
     default: 0
+  trigger_wait_after_last_change_seconds:
+    description: "Seconds to wait after last table update before triggering ing_set_rfm. sandbox/dev: 30, uat/prod: 600."
+    default: 30
 
 targets:
   sandbox:
@@ -84,6 +87,7 @@ targets:
       catalog_silver_standard: silver_standard
       catalog_gold_mart: gold_mart
       schema_rfm: rfm
+      trigger_wait_after_last_change_seconds: 600
       slack_notify_destination_id: "b5d86d0f-6489-4ace-baea-a306094ece5a"
       slack_alert_destination_id: "4feefb1d-965a-424b-863d-ed98050a95df"
     resources:
@@ -106,6 +110,7 @@ targets:
       catalog_silver_standard: silver_standard
       catalog_gold_mart: gold_mart
       schema_rfm: rfm
+      trigger_wait_after_last_change_seconds: 600
       slack_notify_destination_id: "51fff447-a32a-46d6-b441-ea7b14113f11"
       slack_alert_destination_id: "377eff5e-8487-4405-89b4-35ac79f83f57"
     resources:
