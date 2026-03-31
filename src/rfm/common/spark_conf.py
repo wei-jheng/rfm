@@ -20,6 +20,14 @@ def get_ingest_dt(spark: SparkSession) -> datetime:
     return datetime.fromtimestamp(int(stripped), tz=_TZ_TAIPEI)
 
 
+def get_flow_version(spark: SparkSession, conf_key: str) -> int:
+    """讀取 flow_version spark conf；未設定或非整數時 raise ValueError。"""
+    value = spark.conf.get(conf_key, None)
+    if not value or not value.strip().isdigit():
+        raise ValueError(f'spark conf {conf_key!r} is missing or not an integer')
+    return int(value.strip())
+
+
 def get_today(spark: SparkSession) -> str | None:
     """讀取 today spark conf (yyyy-MM-dd)；若未設定則回傳 None（由 pipeline 使用 current_date）。"""
     value = spark.conf.get('today', None)

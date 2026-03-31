@@ -1,0 +1,191 @@
+# merchant_mapping.toml
+#
+# 新增通路只需在此檔案新增一個 [[rules]] 區塊，不需改 Python code。
+# 欄位說明：
+#   pattern          - place_name 比對 regex（先 match 先贏，順序很重要）
+#   name             - 標準通路名稱
+#   affiliation_type - 集團內 / 集團外
+#   merchant_category
+#   sales_channel
+
+[[rules]]
+pattern = '統一超商'
+name = '7-ELEVEN'
+affiliation_type = '集團內'
+merchant_category = '超商'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '全家便利商店'
+name = 'FamilyMart'
+affiliation_type = '集團外'
+merchant_category = '超商'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '萊爾富國際'
+name = 'Hi-Life'
+affiliation_type = '集團外'
+merchant_category = '超商'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '來來超商'
+name = 'OK-Mart'
+affiliation_type = '集團外'
+merchant_category = '超商'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '三商家購'
+name = '美廉社'
+affiliation_type = '集團外'
+merchant_category = '超商'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '統一生活事業|康是美'
+name = '康是美'
+affiliation_type = '集團內'
+merchant_category = '藥妝'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '台灣屈臣氏個人用品'
+name = '屈臣氏'
+affiliation_type = '集團外'
+merchant_category = '藥妝'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '寶雅國際'
+name = '寶雅'
+affiliation_type = '集團外'
+merchant_category = '藥妝'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '星巴克|悠旅'
+name = '星巴克'
+affiliation_type = '集團內'
+merchant_category = '咖啡廳'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '路易莎職人咖啡|路易莎'
+name = '路易莎'
+affiliation_type = '集團外'
+merchant_category = '咖啡廳'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '美食達人股份'
+name = '85度C'
+affiliation_type = '集團外'
+merchant_category = '咖啡廳'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '好膳企業|金星生活'
+name = 'Dreamers Coffee'
+affiliation_type = '集團外'
+merchant_category = '咖啡廳'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '咖碼股份'
+name = 'Cama'
+affiliation_type = '集團外'
+merchant_category = '咖啡廳'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^統一時代台北|^統一百華股份有限公司台北分公司$'
+name = '統一時代台北'
+affiliation_type = '集團內'
+merchant_category = '百貨_雙北'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^夢時代\+統一時代|^統正開發股份有限公司$|^統一百華股份有限公司夢廣場分公司$'
+name = '夢時代'
+affiliation_type = '集團內'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^新光三越百貨股份有限公司(台北.+)?$'
+name = '新光三越台北'
+affiliation_type = '集團外'
+merchant_category = '百貨_雙北'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^新光三越百貨股份有限公司高雄三多'
+name = '新光三越三多'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^新光三越百貨股份有限公司高雄左營'
+name = '新光三越左營'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^遠東百貨股份有限公司((信義|板橋.*)分公司)?$'
+name = '遠東百貨雙北'
+affiliation_type = '集團外'
+merchant_category = '百貨_雙北'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^遠東百貨股份有限公司高雄分公司$'
+name = '遠東百貨高雄'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^太平洋崇光百貨股份有限公司((遠東大巨蛋|敦化|復興|天母)分公司)?$'
+name = 'SOGO台北'
+affiliation_type = '集團外'
+merchant_category = '百貨_雙北'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^太平洋崇光百貨股份有限公司高雄分公司$'
+name = 'SOGO高雄'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^微風置地股份有限公司|^微風股份有限公司$|^微風廣場實業股份有限公司$'
+name = '微風廣場'
+affiliation_type = '集團外'
+merchant_category = '百貨_雙北'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^漢神購物中心股份有限公司高雄分公司$'
+name = '漢神巨蛋'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^漢神名店百貨股份有限公司$'
+name = '漢神百貨'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
+
+[[rules]]
+pattern = '^義大開發股份有限公司$'
+name = '義大世界'
+affiliation_type = '集團外'
+merchant_category = '百貨_高雄'
+sales_channel = '線下'
