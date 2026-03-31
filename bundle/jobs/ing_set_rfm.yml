@@ -8,6 +8,7 @@ resources:
           table_names:
             - ${var.catalog_silver_source}.${var.schema_bda}.pos_master_member
             - ${var.catalog_silver_source}.${var.schema_opei}.opei_frontend_invoice_list
+            - ${var.catalog_silver_source}.${var.schema_opei}.opei_iuo_invoice_detail
           wait_after_last_change_seconds: ${var.trigger_wait_after_last_change_seconds}
           condition: ALL_UPDATED
       tags:
@@ -17,7 +18,13 @@ resources:
         resource_type: job
         job_id: J003
       tasks:
-        - task_key: dlt_rfm_pipeline
+        - task_key: dlt_rfm_ingestion
           max_retries: ${var.task_retry_on_failure}
           pipeline_task:
-            pipeline_id: ${resources.pipelines.pln_rfm.id}
+            pipeline_id: ${resources.pipelines.pln_rfm_ingestion.id}
+        - task_key: dlt_rfm_gold
+          depends_on:
+            - task_key: dlt_rfm_ingestion
+          max_retries: ${var.task_retry_on_failure}
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pln_rfm_gold.id}

@@ -42,9 +42,12 @@ variables:
   task_retry_on_failure:
     description: "Default max retries for each task on failure. Override per task by hardcoding max_retries in the job YAML."
     default: 0
+  flow_version_fact_txn_unified:
+    description: "CDC flow version for fact_txn_unified. Increment to reprocess all data after table drop."
+    default: "0"
   trigger_wait_after_last_change_seconds:
-    description: "Seconds to wait after last table update before triggering ing_set_rfm. sandbox/dev: 30, uat/prod: 600."
-    default: 30
+    description: "Seconds to wait after last table update before triggering ing_set_rfm. Must be > 60. sandbox/dev: 61, uat/prod: 600."
+    default: 61
 
 targets:
   sandbox:

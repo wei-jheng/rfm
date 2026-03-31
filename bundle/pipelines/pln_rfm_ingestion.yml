@@ -1,36 +1,28 @@
 resources:
   pipelines:
-    pln_rfm:
-      name: "[${bundle.target}] pln_rfm"
+    pln_rfm_ingestion:
+      name: "[${bundle.target}] pln_rfm_ingestion"
       tags:
         env: ${bundle.target}
         domain: rfm
         owner: data_eng
         resource_type: pipeline
-        pipeline_id: PPL003
+        pipeline_id: PPL003a
       allow_duplicate_names: true
       serverless: true
-      catalog: ${var.catalog_gold_mart}
+      catalog: ${var.catalog_silver_standard}
       schema: ${var.schema_rfm}
       environment:
         dependencies:
           - ${workspace.artifact_path}/.internal/rfm-${var.whl_version}-py3-none-any.whl
       configuration:
-        today: ${var.today}
         catalog_silver_source: ${var.catalog_silver_source}
         schema_bda: ${var.schema_bda}
         schema_opei: ${var.schema_opei}
         catalog_silver_standard: ${var.catalog_silver_standard}
-        catalog_gold_mart: ${var.catalog_gold_mart}
         schema_rfm: ${var.schema_rfm}
+        flow_version_fact_txn_unified: ${var.flow_version_fact_txn_unified}
+        workspace_file_path: ${workspace.file_path}
       libraries:
         - file:
             path: ../../workflow/pln_rfm/transformations/fact_txn_unified.py
-        - file:
-            path: ../../workflow/pln_rfm/transformations/gold_mart/fact_mthly_rfm.py
-        - file:
-            path: ../../workflow/pln_rfm/transformations/gold_mart/mart_mthly_sales.py
-        - file:
-            path: ../../workflow/pln_rfm/transformations/gold_mart/mart_mthly_stats.py
-        - file:
-            path: ../../workflow/pln_rfm/transformations/gold_mart/mart_mthly_txn_range.py
