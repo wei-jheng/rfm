@@ -4,7 +4,9 @@ from datetime import datetime
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
-from rfm.common.spark_conf import get_ingest_dt, get_today
+import pytest
+
+from rfm.common.spark_conf import get_flow_version, get_ingest_dt, get_today
 
 _TZ_TAIPEI = ZoneInfo('Asia/Taipei')
 
@@ -104,3 +106,55 @@ def test_get_today_strips_whitespace() -> None:
     mock_spark = MagicMock()
     mock_spark.conf.get.return_value = '  2024-01-15  '
     assert get_today(mock_spark) == '2024-01-15'
+
+
+# ── get_flow_version ──────────────────────────────────────────────────────────
+
+
+def test_get_flow_version_valid_positive() -> None:
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = '5'
+    assert get_flow_version(mock_spark, 'flow_version_pos') == 5
+
+
+def test_get_flow_version_valid_with_whitespace() -> None:
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = ' 7 '
+    assert get_flow_version(mock_spark, 'flow_version_pos') == 7
+
+
+def test_get_flow_version_missing_raises() -> None:
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = None
+    with pytest.raises(ValueError, match='flow_version_pos'):
+        get_flow_version(mock_spark, 'flow_version_pos')
+
+
+def test_get_flow_version_empty_string_raises() -> None:
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = ''
+    with pytest.raises(ValueError):
+        get_flow_version(mock_spark, 'flow_version_pos')
+
+
+def test_get_flow_version_non_numeric_raises() -> None:
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = 'abc'
+    with pytest.raises(ValueError):
+        get_flow_version(mock_spark, 'flow_version_pos')
+
+
+def test_get_flow_version_negative_raises() -> None:
+    """Negative integers should raise ValueError; previously accepted due to lstrip('-') bug."""
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = '-3'
+    with pytest.raises(ValueError):
+        get_flow_version(mock_spark, 'flow_version_pos')
+
+
+def test_get_flow_version_double_minus_raises() -> None:
+    """'--123' passes lstrip('-').isdigit() but int() fails; fixed by removing lstrip."""
+    mock_spark = MagicMock()
+    mock_spark.conf.get.return_value = '--123'
+    with pytest.raises(ValueError):
+        get_flow_version(mock_spark, 'flow_version_pos')

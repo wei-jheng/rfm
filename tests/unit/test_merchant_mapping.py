@@ -1,37 +1,34 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
+from rfm.config import merchant_mapping
 from rfm.config.merchant_mapping import (
-    MERCHANT_ATTRS,
-    MERCHANT_NAME_RULES,
-    get_affiliation_type_col,
-    get_merchant_category_col,
+    MERCHANT_RULES,
     get_merchant_name_col,
-    get_sales_channel_col,
+    load_rules_from_path,
 )
 
 # ── Data integrity (no Spark needed) ─────────────────────────────────────────
 
 
-def test_merchant_name_rules_all_targets_exist_in_attrs() -> None:
-    """MERCHANT_NAME_RULES 的 target 集合必須與 MERCHANT_ATTRS 的 key 集合完全一致。"""
-    rule_targets = {target for _, target in MERCHANT_NAME_RULES}
-    assert rule_targets == set(MERCHANT_ATTRS.keys())
+def test_load_rules_from_path_returns_unique_names() -> None:
+    """MERCHANT_RULES 中不應有重複的 name（tuple[0]）。"""
+    names = [v[0].lower() for v in MERCHANT_RULES.values()]
+    assert len(names) == len(set(names))
 
 
-def test_merchant_name_rules_no_duplicate_targets() -> None:
-    """MERCHANT_NAME_RULES 中不應有重複的 target 名稱（忽略大小寫）。"""
-    targets = [target.lower() for _, target in MERCHANT_NAME_RULES]
-    assert len(targets) == len(set(targets))
-
-
-def test_merchant_attrs_no_field_is_empty() -> None:
-    for name, attrs in MERCHANT_ATTRS.items():
-        assert attrs.affiliation_type, f'{name}: affiliation_type is empty'
-        assert attrs.merchant_category, f'{name}: merchant_category is empty'
-        assert attrs.sales_channel, f'{name}: sales_channel is empty'
+def test_load_rules_from_path_all_fields_are_non_empty() -> None:
+    for pattern, attrs in MERCHANT_RULES.items():
+        name, affiliation_type, merchant_category, sales_channel = attrs
+        assert name, f'pattern="{pattern}": name is empty'
+        assert affiliation_type, f'pattern="{pattern}": affiliation_type is empty'
+        assert merchant_category, f'pattern="{pattern}": merchant_category is empty'
+        assert sales_channel, f'pattern="{pattern}": sales_channel is empty'
 
 
 # ── Parametrize data ──────────────────────────────────────────────────────────
@@ -128,86 +125,145 @@ def test_get_merchant_name_col_no_false_positives(
     )
 
 
-# ── get_affiliation_type_col ──────────────────────────────────────────────────
-
-
-def test_get_affiliation_type_col_null_returns_external(spark: SparkSession) -> None:
-    df = spark.createDataFrame([(None,)], schema='merchant_name string')
-    result = df.withColumn('a', get_affiliation_type_col('merchant_name')).first()['a']
-    assert result == '集團外'
-
-
-def test_get_affiliation_type_col_internal(spark: SparkSession) -> None:
-    df = spark.createDataFrame([('7-ELEVEN',)], ['merchant_name'])
-    result = df.withColumn('a', get_affiliation_type_col('merchant_name')).first()['a']
-    assert result == '集團內'
-
-
-def test_get_affiliation_type_col_external(spark: SparkSession) -> None:
-    df = spark.createDataFrame([('FamilyMart',)], ['merchant_name'])
-    result = df.withColumn('a', get_affiliation_type_col('merchant_name')).first()['a']
-    assert result == '集團外'
-
-
-def test_get_affiliation_type_col_other(spark: SparkSession) -> None:
-    df = spark.createDataFrame([('其他',)], ['merchant_name'])
-    result = df.withColumn('a', get_affiliation_type_col('merchant_name')).first()['a']
-    assert result == '集團外'
-
-
-# ── get_merchant_category_col ─────────────────────────────────────────────────
+# ── merchant_attr_view join (get_merchant_name_col + view) ────────────────────
 
 
 @pytest.mark.parametrize(
-    'merchant_name,expected_category',
-    [(name, attrs.merchant_category) for name, attrs in MERCHANT_ATTRS.items()],
+    'place_name,expected_merchant_name,expected_affiliation,expected_category,expected_channel',
+    [
+        ('統一超商股份有限公司XX分公司', '7-ELEVEN', '集團內', '超商', '線下'),
+        ('全家便利商店股份有限公司', 'FamilyMart', '集團外', '超商', '線下'),
+        ('康是美股份有限公司', '康是美', '集團內', '藥妝', '線下'),
+        ('星巴克咖啡有限公司', '星巴克', '集團內', '咖啡廳', '線下'),
+        ('新光三越百貨股份有限公司', '新光三越台北', '集團外', '百貨_雙北', '線下'),
+    ],
 )
-def test_get_merchant_category_col_all_merchants(
-    spark: SparkSession, merchant_name: str, expected_category: str
+def test_get_merchant_name_col_view_join_known_merchants(
+    spark: SparkSession,
+    merchant_attr_view: None,
+    place_name: str,
+    expected_merchant_name: str,
+    expected_affiliation: str,
+    expected_category: str,
+    expected_channel: str,
 ) -> None:
-    df = spark.createDataFrame([(merchant_name,)], ['merchant_name'])
-    result = df.withColumn('c', get_merchant_category_col('merchant_name')).first()['c']
-    assert result == expected_category, (
-        f'merchant_name="{merchant_name}": expected "{expected_category}", got "{result}"'
+    view = spark.table('merchant_attr_view')
+    df = spark.createDataFrame([(place_name,)], ['place_name'])
+    row = (
+        df.withColumn('merchant_name', get_merchant_name_col('place_name'))
+        .join(F.broadcast(view), F.col('merchant_name') == view['name'], 'left')
+        .drop(view['name'])
+        .first()
+    )
+    assert row['merchant_name'] == expected_merchant_name
+    assert row['affiliation_type'] == expected_affiliation
+    assert row['merchant_category'] == expected_category
+    assert row['sales_channel'] == expected_channel
+
+
+def test_get_merchant_name_col_view_join_unknown_place_name(
+    spark: SparkSession, merchant_attr_view: None
+) -> None:
+    view = spark.table('merchant_attr_view')
+    df = spark.createDataFrame([('完全不相關的通路',)], ['place_name'])
+    row = (
+        df.withColumn('merchant_name', get_merchant_name_col('place_name'))
+        .join(F.broadcast(view), F.col('merchant_name') == view['name'], 'left')
+        .drop(view['name'])
+        .first()
+    )
+    assert row['merchant_name'] == '其他'
+    assert row['affiliation_type'] == '集團外'
+    assert row['merchant_category'] == '其他'
+    assert row['sales_channel'] == '其他'
+
+
+def test_get_merchant_name_col_view_join_all_merchants(
+    spark: SparkSession, merchant_attr_view: None
+) -> None:
+    """Every merchant in MERCHANT_RULES should resolve to the correct attrs via view join."""
+    cases = [(v[0], v[1], v[2], v[3]) for v in MERCHANT_RULES.values()]
+    rows = [(name,) for name, *_ in cases]
+    df = spark.createDataFrame(rows, ['merchant_name'])
+    view = spark.table('merchant_attr_view')
+    result = (
+        df.join(F.broadcast(view), df['merchant_name'] == view['name'], 'left')
+        .drop(view['name'])
+        .collect()
+    )
+    result_map = {r['merchant_name']: r for r in result}
+    for name, affiliation, category, channel in cases:
+        r = result_map[name]
+        assert r['affiliation_type'] == affiliation, (
+            f'{name}: affiliation_type mismatch'
+        )
+        assert r['merchant_category'] == category, f'{name}: merchant_category mismatch'
+        assert r['sales_channel'] == channel, f'{name}: sales_channel mismatch'
+
+
+# ── load_merchant_rules ───────────────────────────────────────────────────────
+
+
+def test_load_merchant_rules_raises_when_workspace_file_path_missing(
+    spark: SparkSession,
+) -> None:
+    """load_merchant_rules() should raise ValueError when spark.conf 'workspace_file_path' is not set."""
+    with pytest.raises(ValueError, match='workspace_file_path'):
+        merchant_mapping.load_merchant_rules(spark)
+
+
+# ── _load_from_path edge cases ────────────────────────────────────────────────
+
+
+def test_load_rules_from_path_missing_file_raises() -> None:
+    with pytest.raises(FileNotFoundError):
+        load_rules_from_path('/nonexistent/path/merchant_mapping.toml')
+
+
+def test_load_rules_from_path_missing_required_field_raises(tmp_path: Path) -> None:
+    """TOML rule missing 'name' field should raise KeyError."""
+    bad_toml = tmp_path / 'bad.toml'
+    bad_toml.write_text(
+        '[[rules]]\npattern = "test"\naffiliation_type = "集團外"\nmerchant_category = "其他"\nsales_channel = "線下"\n',
+        encoding='utf-8',
+    )
+    with pytest.raises(KeyError):
+        load_rules_from_path(str(bad_toml))
+
+
+def test_load_rules_from_path_reload_replaces_old_rules(tmp_path: Path) -> None:
+    """Second call to load_rules_from_path should clear previous rules."""
+    dummy_toml = tmp_path / 'dummy.toml'
+    dummy_toml.write_text(
+        '[[rules]]\npattern = "dummy"\nname = "DummyMerchant"\naffiliation_type = "集團外"\nmerchant_category = "其他"\nsales_channel = "線下"\n',
+        encoding='utf-8',
+    )
+    load_rules_from_path(str(dummy_toml))
+    assert 'dummy' in merchant_mapping.MERCHANT_RULES
+    assert any(
+        v[0] == 'DummyMerchant' for v in merchant_mapping.MERCHANT_RULES.values()
+    )
+
+    real_toml = Path(__file__).parents[2] / 'resources/config/rfm/merchant_mapping.toml'
+    load_rules_from_path(str(real_toml))
+    assert 'dummy' not in merchant_mapping.MERCHANT_RULES
+    assert all(
+        v[0] != 'DummyMerchant' for v in merchant_mapping.MERCHANT_RULES.values()
     )
 
 
-def test_get_merchant_category_col_null_returns_other(spark: SparkSession) -> None:
-    df = spark.createDataFrame([(None,)], schema='merchant_name string')
-    result = df.withColumn('c', get_merchant_category_col('merchant_name')).first()['c']
-    assert result == '其他'
+# ── get_merchant_name_col with empty MERCHANT_RULES ───────────────────────────
 
 
-def test_get_merchant_category_col_other(spark: SparkSession) -> None:
-    df = spark.createDataFrame([('其他',)], ['merchant_name'])
-    result = df.withColumn('c', get_merchant_category_col('merchant_name')).first()['c']
-    assert result == '其他'
-
-
-# ── get_sales_channel_col ─────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(
-    'merchant_name,expected_channel',
-    [(name, attrs.sales_channel) for name, attrs in MERCHANT_ATTRS.items()],
-)
-def test_get_sales_channel_col_all_merchants(
-    spark: SparkSession, merchant_name: str, expected_channel: str
+def test_get_merchant_name_col_empty_rules_returns_other_literal(
+    spark: SparkSession,
 ) -> None:
-    df = spark.createDataFrame([(merchant_name,)], ['merchant_name'])
-    result = df.withColumn('ch', get_sales_channel_col('merchant_name')).first()['ch']
-    assert result == expected_channel, (
-        f'merchant_name="{merchant_name}": expected "{expected_channel}", got "{result}"'
-    )
-
-
-def test_get_sales_channel_col_null_returns_other(spark: SparkSession) -> None:
-    df = spark.createDataFrame([(None,)], schema='merchant_name string')
-    result = df.withColumn('ch', get_sales_channel_col('merchant_name')).first()['ch']
-    assert result == '其他'
-
-
-def test_get_sales_channel_col_unknown_defaults_other(spark: SparkSession) -> None:
-    df = spark.createDataFrame([('未知通路',)], ['merchant_name'])
-    result = df.withColumn('ch', get_sales_channel_col('merchant_name')).first()['ch']
-    assert result == '其他'
+    """When MERCHANT_RULES is empty, get_merchant_name_col should return F.lit('其他')."""
+    real_toml = Path(__file__).parents[2] / 'resources/config/rfm/merchant_mapping.toml'
+    merchant_mapping.MERCHANT_RULES.clear()
+    try:
+        df = spark.createDataFrame([('任意通路名稱',)], ['place_name'])
+        result = df.withColumn('m', get_merchant_name_col('place_name')).first()['m']
+        assert result == '其他'
+    finally:
+        load_rules_from_path(str(real_toml))
