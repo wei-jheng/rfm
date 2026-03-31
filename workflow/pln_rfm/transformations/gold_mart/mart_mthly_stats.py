@@ -7,6 +7,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from rfm.common.spark_conf import get_ingest_dt
+from rfm.transforms.stats import compute_stats
 
 try:
     spark  # noqa: F821, B018 — injected by Databricks DLT runtime
@@ -22,8 +23,6 @@ _catalog_gm = spark.conf.get('catalog_gold_mart')
 _schema_rfm = spark.conf.get('schema_rfm')
 _gm = f'{_catalog_gm}.{_schema_rfm}'
 
-# ── Stats table configs ────────────────────────────────────────────────────────
-
 _MCHT_COLS = [
     'transaction_month',
     'affiliation_type',
@@ -31,12 +30,6 @@ _MCHT_COLS = [
     'merchant_name',
 ]
 _AFFI_COLS = ['transaction_month', 'affiliation_type']
-
-_GRANULARITIES: list[tuple[str, list[str]]] = [
-    ('mcht', _MCHT_COLS),
-    ('affi', _AFFI_COLS),
-]
-
 _METRICS = ['recency', 'frequency', 'monetary']
 
 
@@ -59,42 +52,10 @@ _STATS_CONFIGS: list[StatsMvConfig] = [
         group_cols=group_cols,
     )
     for metric in _METRICS
-    for gran, group_cols in _GRANULARITIES
+    for gran, group_cols in [('mcht', _MCHT_COLS), ('affi', _AFFI_COLS)]
 ]
 
-
-# ── Helper ─────────────────────────────────────────────────────────────────────
-
-
-def _build_stats_df(source: str, group_cols: list[str], metric: str) -> DataFrame:
-    """Build monthly RFM statistics aggregation DataFrame for a single metric."""
-    select_cols = [
-        *group_cols,
-        'unique_member_count',
-        f'avg_{metric}',
-        f'min_{metric}',
-        f'max_{metric}',
-        f'median_{metric}',
-        '_ingest_dt',
-    ]
-    return (
-        spark.read.table(f'{_gm}.{source}')
-        .groupBy(*group_cols)
-        .agg(
-            F.countDistinct('gid').alias('unique_member_count'),
-            F.avg(metric).cast('int').alias(f'avg_{metric}'),
-            F.min(metric).cast('int').alias(f'min_{metric}'),
-            F.max(metric).cast('int').alias(f'max_{metric}'),
-            F.expr(f'percentile_approx({metric}, 0.5)')
-            .cast('int')
-            .alias(f'median_{metric}'),
-        )
-        .withColumn('_ingest_dt', F.lit(_ingest_dt))
-        .select(*select_cols)
-    )
-
-
-# ── Factory function ───────────────────────────────────────────────────────────
+# ── Register all stats tables ─────────────────────────────────────────────────
 
 
 def _register_stats_mv(config: StatsMvConfig) -> None:
@@ -105,11 +66,14 @@ def _register_stats_mv(config: StatsMvConfig) -> None:
         partition_cols=None,
         cluster_by_auto=True,
     )
-    def _mv() -> DataFrame:
-        return _build_stats_df(config.source, config.group_cols, config.metric)
+    def _build_stats_mv() -> DataFrame:
+        """Build DLT materialized view for monthly RFM statistics."""
+        return compute_stats(
+            spark.read.table(f'{_gm}.{config.source}'),
+            config.group_cols,
+            config.metric,
+        ).withColumn('_ingest_dt', F.lit(_ingest_dt))
 
-
-# ── Register all stats tables ─────────────────────────────────────────────────
 
 for _config in _STATS_CONFIGS:
     _register_stats_mv(_config)
