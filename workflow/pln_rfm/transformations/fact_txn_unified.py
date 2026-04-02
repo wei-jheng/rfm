@@ -30,10 +30,10 @@ _OPEI_TABLE = f'{_catalog_ss}.{_schema_opei}.opei_frontend_invoice_list'
 _IUO_TABLE = f'{_catalog_ss}.{_schema_opei}.opei_iuo_invoice_detail'
 _FACT_TXN_UNIFIED = f'{_catalog_ss_std}.{_schema_rfm}.fact_txn_unified'
 
-# ── Latest batch ──────────────────────────────────────────────────────────────
-# 先取 max _ingest_dt 為 literal，再 filter → Delta predicate pushdown 只讀當批 Parquet files。
+# ── IUO batch scope ───────────────────────────────────────────────────────────
+# IUO 是 static read（無 checkpoint），需明確限制在當批資料。
 # _OPEI_TABLE 與 _IUO_TABLE 同屬 invoice_opei pipeline，共用同一個 _opei_max_ingest_dt。
-_pos_max_ingest_dt = spark.read.table(_POS_TABLE).agg(F.max('_ingest_dt')).first()[0]
+# POS / OPEI streaming reads 不需要 _ingest_dt filter：DLT checkpoint 已保證只處理新資料。
 _opei_max_ingest_dt = spark.read.table(_OPEI_TABLE).agg(F.max('_ingest_dt')).first()[0]
 
 
@@ -84,7 +84,6 @@ def _build_pos_df() -> DataFrame:
     """Build POS streaming DataFrame for the current batch."""
     return (
         spark.readStream.table(_POS_TABLE)
-        .filter(F.col('_ingest_dt') == F.lit(_pos_max_ingest_dt))
         .filter(F.col('job_id') == '23')
         .select(
             F.col('mid').alias('gid'),
@@ -107,9 +106,7 @@ _enrich_opei_with_merchant_attrs = enrich_opei_with_merchant_attrs
 
 def _build_opei_df(merchant_attrs: DataFrame, iuo_keys: DataFrame) -> DataFrame:
     """Build OPEI streaming DataFrame with merchant attributes and affiliation override."""
-    opei_raw = spark.readStream.table(_OPEI_TABLE).filter(
-        F.col('_ingest_dt') == F.lit(_opei_max_ingest_dt)
-    )
+    opei_raw = spark.readStream.table(_OPEI_TABLE)
     opei_with_attrs = _enrich_opei_with_merchant_attrs(
         opei_raw, merchant_attrs, iuo_keys
     )
